@@ -460,20 +460,48 @@ pdfetch_INSEE <- function(identifiers) {
 #' pdfetch_ONS(c("LF24","LF2G"), "lms")
 #' }
 pdfetch_ONS <- function(identifiers, dataset) {
-  identifiers <- tolower(identifiers)
+  identifiers <- toupper(identifiers)
   
   results <- list()
   
-  for (id in identifiers) {
-    url <- paste0("https://api.beta.ons.gov.uk/v1/datasets/",dataset,"/editions/time-series/versions/1/observations?time=*&aggregate=",id)
+  ons_api <- "https://api.beta.ons.gov.uk/v1"
+  search_api <- paste0(
+    ons_api, "/search?q=", paste0(identifiers, collapse = "+")
+  )
+  
+  if (!missing(dataset)) {
+    search_api <- paste0(search_api, "&dataset_ids=", toupper(dataset))
+  }
+  
+  raw <- httr::content(httr::GET(search_api))
+  
+  res <- lapply(raw$items, function(x) {
+    c(
+      title = x$title,
+      uri = x$uri,
+      cdid = x$cdid
+    )
+  })
+  res <- as.data.frame(do.call("rbind", res))
+  
+  # output order might differ from input
+  res <- res[match(identifiers, res$cdid), ]
+  
+  for (id in seq_len(nrow(res))) {
+    # url <- paste0("https://www.ons.gov.uk/generator?format=csv&uri=", res$uri[id])
+    # csv <- tempfile(fileext = ".csv")
+    # download.file(url, csv)
+    # raw <- read.csv(csv)
+    
+    url <- paste0("https://api.beta.ons.gov.uk/v1/data?uri=", res$uri[id])
+    raw <- httr::content(httr::GET(url))
 
-    raw <- content(GET(url))
     if (is.null(raw)) {
       warning(paste0('Series ', id, ' in dataset ', dataset, ' not found.'))
       next
     }
-    print(raw)
-    
+    # message(res$cdid[id], ": ", res$title[id])
+
     if (length(raw$months) > 0) {
       month <- sapply(raw$months, function(x) match(x$month, c("January","February","March","April","May","June","July","August","September","October","November","December")))
       year <- sapply(raw$months, function(x) as.numeric(x$year))
@@ -487,16 +515,16 @@ pdfetch_ONS <- function(identifiers, dataset) {
       year <- sapply(raw$years, function(x) as.numeric(x$year))
       values <- sapply(raw$years, function(x) as.numeric(x$value))
     }
-    
+
     dates <- month_end(as.Date(ISOdate(year, month, 1)))
     x <- xts(values, dates)
-    colnames(x) <- toupper(id)
+    colnames(x) <- toupper(res$cdid[id])
     results[[id]] <- x
   }
 
   if (length(results) == 0)
     return(NULL)
-  
+
   na.trim(do.call(merge.xts, results), is.na="all")
 }
 
