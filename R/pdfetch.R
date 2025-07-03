@@ -460,9 +460,10 @@ pdfetch_INSEE <- function(identifiers) {
 #' pdfetch_ONS(c("LF24","LF2G"), "lms")
 #' }
 pdfetch_ONS <- function(identifiers, dataset) {
+  orig_identifiers <- identifiers
   identifiers <- toupper(identifiers)
   
-  results <- list()
+  results <- vector("list", length(identifiers))
   
   ons_api <- "https://api.beta.ons.gov.uk/v1"
   search_api <- paste0(
@@ -477,30 +478,36 @@ pdfetch_ONS <- function(identifiers, dataset) {
   
   res <- lapply(raw$items, function(x) {
     c(
-      title = x$title,
+      title = x$title, # series label
       uri = x$uri,
       cdid = x$cdid
     )
   })
   res <- as.data.frame(do.call("rbind", res))
   
+  ## if the input is not found in res, res$count can be 0. But if some inputs
+  ## are found, only these are returned by the search api
+  found_identifiers <- match(identifiers, res$cdid)
+  if (anyNA(found_identifiers) || raw$count < length(identifiers)) {
+    miss_identifiers <- paste(
+      orig_identifiers[is.na(found_identifiers)],
+      collapse = ", "
+    )
+    msg <- paste0('Series ', miss_identifiers)
+    if (!missing(dataset)) {
+      msg <- paste0(msg, ' in dataset ', dataset)
+    }
+    msg <- paste0(msg, ' not found.')
+    warning(msg, call. = FALSE)
+  }
+  
   # output order might differ from input
-  res <- res[match(identifiers, res$cdid), ]
+  res <- res[found_identifiers[!is.na(found_identifiers)], ]
   
   for (id in seq_len(nrow(res))) {
-    # url <- paste0("https://www.ons.gov.uk/generator?format=csv&uri=", res$uri[id])
-    # csv <- tempfile(fileext = ".csv")
-    # download.file(url, csv)
-    # raw <- read.csv(csv)
     
-    url <- paste0("https://api.beta.ons.gov.uk/v1/data?uri=", res$uri[id])
+    url <- paste0(ons_api, "/data?uri=", res$uri[id])
     raw <- httr::content(httr::GET(url))
-
-    if (is.null(raw)) {
-      warning(paste0('Series ', id, ' in dataset ', dataset, ' not found.'))
-      next
-    }
-    # message(res$cdid[id], ": ", res$title[id])
 
     if (length(raw$months) > 0) {
       month <- sapply(raw$months, function(x) match(x$month, c("January","February","March","April","May","June","July","August","September","October","November","December")))
