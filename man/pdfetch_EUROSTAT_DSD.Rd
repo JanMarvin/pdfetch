@@ -14,6 +14,6 @@ Fetch description for a Eurostat dataset
 }
 \examples{
 \dontrun{
-pdfetch_EUROSTAT_DSD("namq_gdp_c")
+pdfetch_EUROSTAT_DSD("namq_10_gdp")
 }
 }

@@ -142,7 +142,7 @@ pdfetch_EUROSTAT_GETDSD <- function(flowRef) {
 #' @export
 #' @examples
 #' \dontrun{
-#' pdfetch_EUROSTAT_DSD("namq_gdp_c")
+#' pdfetch_EUROSTAT_DSD("namq_10_gdp")
 #' }
 pdfetch_EUROSTAT_DSD <- function(flowRef) {
   results <- NULL
@@ -183,8 +183,8 @@ pdfetch_EUROSTAT_DSD <- function(flowRef) {
 #' @export
 #' @examples
 #' \dontrun{
-#' pdfetch_EUROSTAT("namq_gdp_c", FREQ="Q", S_ADJ="NSA", UNIT="MIO_EUR", 
-#'                           INDIC_NA="B1GM", GEO=c("DE","UK"))
+#' pdfetch_EUROSTAT("namq_10_gdp", FREQ="Q", S_ADJ="NSA", UNIT="CP_MEUR",
+#'                  INDIC_NA="B1GM", GEO=c("DE","UK"))
 #' }
 pdfetch_EUROSTAT <- function(flowRef, from, to, ...) {
   arguments <- list(...)
@@ -226,12 +226,13 @@ pdfetch_EUROSTAT <- function(flowRef, from, to, ...) {
   doc <- doc %>% 
     select(c("freq","ID_COLUMN","TIME_PERIOD","OBS_VALUE")) %>% 
     tidyr::pivot_wider(names_from="ID_COLUMN", values_from="OBS_VALUE") %>% 
+    mutate(TIME_PERIOD = as.character(.data$TIME_PERIOD)) %>%
     mutate(
       date=case_when(
-        freq == 'A' ~ as.Date(ISOdate(TIME_PERIOD,12,31)),
-        freq == 'Q' ~ quarter_end(as.Date(lubridate::parse_date_time2(TIME_PERIOD, orders="Y-q"))),
-        freq == 'M' ~ month_end(as.Date(lubridate::parse_date_time2(TIME_PERIOD, orders="Y-m"))),
-        TRUE ~ as.Date(TIME_PERIOD, format="%Y-%m-%d")
+        freq == 'A' ~ as.Date(ISOdate(.data$TIME_PERIOD,12,31)),
+        freq == 'Q' ~ quarter_end(as.Date(lubridate::parse_date_time2(.data$TIME_PERIOD, orders="Y-q"))),
+        freq == 'M' ~ month_end(as.Date(lubridate::parse_date_time2(.data$TIME_PERIOD, orders="Y-m"))),
+        TRUE ~ as.Date(.data$TIME_PERIOD, format="%Y-%m-%d")
       )
     )
 
